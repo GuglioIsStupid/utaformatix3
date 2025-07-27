@@ -16,6 +16,7 @@ import core.model.Format.VocaloidMid
 import core.model.Format.Vpr
 import core.model.Format.Vsq
 import core.model.Format.Vsqx
+import core.model.Format.Tlp
 import core.model.ImportWarning
 import core.model.Project
 import csstype.FontWeight
@@ -189,6 +190,7 @@ private val Format.description: String?
             StandardMid -> Strings.StandardMidDescription
             UfData -> Strings.UfDataFormatDescription
             Tssln -> Strings.VoiSonaFormatDescription
+            Tlp -> Strings.TuneLabFormatDescription
         }?.let { string(it) }
 
 private val Format.iconPath: String?
@@ -209,6 +211,7 @@ private val Format.iconPath: String?
             StandardMid -> Resources.standardMidiIcon
             UfData -> Resources.ufdataIcon
             Tssln -> Resources.tsslnIcon
+            Tlp -> null
         }
 
 external interface OutputFormatSelectorProps : Props {
