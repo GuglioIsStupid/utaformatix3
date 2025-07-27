@@ -110,7 +110,7 @@ object Tlp {
                         tickOff = note.pos + note.dur,
                         lyric = note.lyric.takeUnless { it.isBlank() } ?: params.defaultLyric,
                         key = note.pitch,
-                        phoneme = note.pronunciation,
+                        phoneme = note.properties?.phoneme
                     )
                 }
 
@@ -209,7 +209,7 @@ object Tlp {
 
     @Serializable
     private data class NoteProperties(
-        var temp: Int = 0,
+        var phoneme: String? = null,
     )
 
     private const val BPM_RATE = 100.0
