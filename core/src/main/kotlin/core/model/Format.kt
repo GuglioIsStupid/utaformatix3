@@ -200,11 +200,11 @@ enum class Format(
         parser = { files, params ->
             core.io.Tlp.parse(files.first(), params)
         },
-        generator = { project, features ->
-            core.io.Tlp.generate(project, features)
+        generator = { _, _ ->
+            throw NotImplementedError()
         },
         possibleLyricsTypes = listOf(RomajiCv, RomajiVcv, KanaCv, KanaVcv),
-        availableFeaturesForGeneration = listOf(ConvertPitch, ConvertPhonemes),
+        availableFeaturesForGeneration = listOf(ConvertPhonemes),
     ),
     ;
 

@@ -13,6 +13,7 @@ import core.process.validateNotes
 import core.model.contains
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import org.w3c.files.Blob
 import org.w3c.files.File
@@ -47,7 +48,7 @@ object Tlp {
             project.tempos
                 .map {
                     core.model.Tempo(
-                        tickPosition = it.pos / TICK_RATE,
+                        tickPosition = it.pos.toLong() / TICK_RATE,
                         bpm = it.bpm,
                     )
                 }.takeIf { it.isNotEmpty() } ?: listOf(core.model.Tempo.default).also {
@@ -58,7 +59,7 @@ object Tlp {
             project.tracks.mapIndexed { index, track ->
                 parseTrack(track, index, params)
             }
-        
+
         return core.model.Project(
             format = format,
             inputFiles = listOf(file),
@@ -69,30 +70,6 @@ object Tlp {
             measurePrefix = 0,
             importWarnings = warnings,
         )
-    }
-
-    suspend fun generate(
-        project: core.model.Project,
-        features: List<FeatureConfig>,
-    ): ExportResult {
-        val content = generateContent(project, features)
-        val blob = Blob(arrayOf(content), BlobPropertyBag("application/octet-stream"))
-
-        return ExportResult(
-            blob = blob,
-            fileName = format.getFileName(project.name),
-            notifications = listOfNotNull(
-                if (project.hasXSampaData) null else ExportNotification.PhonemeResetRequiredV4,
-                if (features.contains(Feature.ConvertPitch)) ExportNotification.PitchDataExported else null,
-            ),
-        )
-    }
-
-    private fun generateContent(
-        project: core.model.Project,
-        features: List<FeatureConfig>,
-    ): String {
-        return ""
     }
 
     private fun parseTrack(
@@ -106,31 +83,25 @@ object Tlp {
                 .mapIndexed { index, (tickOffset, note) ->
                     core.model.Note(
                         id = index,
-                        tickOn = note.pos,
-                        tickOff = note.pos + note.dur,
+                        tickOn = note.pos.toLong(),
+                        tickOff = (note.pos + note.dur).toLong(),
                         lyric = note.lyric.takeUnless { it.isBlank() } ?: params.defaultLyric,
                         key = note.pitch,
                         phoneme = note.properties?.phoneme
                     )
                 }
 
-        // TODO: Pitch bends
 
         return core.model.Track(
-                id = trackIndex,
-                name = track.name,
-                notes = notes,
-                pitch = core.model.Pitch(
-                    data = listOf(
-                        0L to 0.0,
-                        1000L to null
-                    ),
-                    isAbsolute = true,
-                )
-            ).validateNotes()
+            id = trackIndex,
+            name = track.name,
+            notes = notes,
+            pitch = core.model.Pitch(listOf(0L to 0.0), isAbsolute = false),
+        ).validateNotes()
     }
 
     private const val TICK_RATE = 1470000L
+    private val format = Format.Tlp
 
     private val jsonSerializer =
         Json {
@@ -140,7 +111,7 @@ object Tlp {
 
     @Serializable
     private data class Project(
-        var version: Int = 0,
+        var version: Int,
         var tempos: List<Tempo> = listOf(),
         var timeSignatures: List<TimeSignature> = listOf(),
         var tracks: List<Track> = listOf(),
@@ -149,10 +120,10 @@ object Tlp {
     @Serializable
     private data class Track(
         var name: String = "Unknown",
-        var gain: Double = 0.0,
-        var pan: Double = 0.0,
-        var mute: Boolean = false,
-        var solo: Boolean = false,
+        var gain: Double,
+        var pan: Double,
+        var mute: Boolean,
+        var solo: Boolean,
         var color: String = "#737CE5",
         var asRefer: Boolean = true,
         var parts: List<Part> = listOf(),
@@ -160,50 +131,64 @@ object Tlp {
 
     @Serializable
     private data class Tempo(
-        var pos: Long = 0,
-        var bpm: Double = 0.0,
+        var pos: Double,
+        var bpm: Double,
     )
 
     @Serializable
     private data class TimeSignature(
-        var barIndex: Int = 0,
-        var numerator: Int = 0,
-        var denominator: Int = 0,
+        var barIndex: Int,
+        var numerator: Int,
+        var denominator: Int,
     )
 
     @Serializable
     private data class Part(
         var name: String = "Unknown",
-        var pos: Long = 0,
-        var dur: Long = 0,
+        var pos: Double,
+        var dur: Double,
         var type: String = "midi",
         var voice: Voice? = null,
-        var properties: Properties? = null,
+        var properties: JsonElement? = null,
         var notes: List<Note> = listOf(),
-        var automations: JsonElement? = null, // This kind of varies depending on the voice being used..?
-        var pitch: JsonElement? = null,
-        var vibratos: JsonElement? = null,
+        var automations: Automations?,
+        var pitch: Array<Array<Double>>? = null,
+        var vibratos: JsonArray? = null,
+    )
+
+    @Serializable
+    private data class Automations(
+        var PitchBend: JsonElement? = null,
+        var PitchBendSensitivity: AutomationEventType? = null,
+        var Dynamics: JsonElement? = null,
+        var Brightness: JsonElement? = null,
+        var Gender: JsonElement? = null,
+        var Growl: JsonElement? = null,
+        var Clearness: JsonElement? = null,
+        var Exciter: JsonElement? = null,
+        var Breathiness: JsonElement? = null,
+        var Air: JsonElement? = null,
+    )
+
+    @Serializable
+    private data class AutomationEventType(
+        var default: Double,
+        var values: JsonArray,
     )
 
     @Serializable
     public data class Voice(
         var type: String = "Unknown",
-        var id: String = "",
-    )
-
-    // I dont FULLY know whats in properties yet....
-    @Serializable
-    private data class Properties(
-        var temp: Int = 0
+        var id: String,
     )
 
     @Serializable
     private data class Note(
-        var pos: Long = 0,
-        var dur: Long = 0,
-        var pitch: Int = 0,
-        var lyric: String = "",
-        var pronunciation: String = "",
+        var pos: Double,
+        var dur: Double,
+        var pitch: Int,
+        var lyric: String,
+        var pronunciation: String,
         var properties: NoteProperties? = null,
     )
 
@@ -211,7 +196,4 @@ object Tlp {
     private data class NoteProperties(
         var phoneme: String? = null,
     )
-
-    private const val BPM_RATE = 100.0
-    private val format = Format.Tlp
 }
